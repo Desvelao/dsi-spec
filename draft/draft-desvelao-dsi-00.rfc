@@ -1,14 +1,14 @@
-Internet-Draft                                               Distributed Social Identity
+Internet-Draft                                               Decentralized Social Identity
 Intended status: Informational                               February 2026
 Expires: August 2026
 
 
-      Distributed Social Identity (DSI)  
+      Decentralized Social Identity (DSI)  
       A Decentralized Profile Specification Using vCard and RSS  
 
       Abstract  
 
-         This document specifies a decentralized social profile format based on vCard 4.0, extended with non-standard properties to support distributed social networks. The specification introduces a mandatory `SOURCE` property to define the canonical location of the vCard, `X-FEED` properties for associating RSS/Atom feeds with the profile, and additional extensible properties for platform-specific identifiers or endorsements. These extensions aim to enable interoperable, self-hosted identity documents that integrate seamlessly with decentralized ecosystems while supporting extensibility for future use cases.
+         This document specifies a decentralized social profile format based on vCard 4.0, extended with non-standard properties to support decentralized social networks. The specification introduces a mandatory `SOURCE` property to define the canonical location of the vCard, `X-FEED` properties for associating RSS/Atom feeds with the profile, and additional extensible properties for platform-specific identifiers or endorsements. These extensions aim to enable interoperable, self-hosted identity documents that integrate seamlessly with decentralized ecosystems while supporting extensibility for future use cases.
 
 
 Status of This Memo
@@ -38,7 +38,7 @@ Table of Contents
          - 3.3.1. X-FEED  
             - 3.3.1.1. Attributes  
                - 3.3.1.1.1. LANGUAGE  
-               - 3.3.1.1.2. CATEGORY  
+               - 3.3.1.1.2. TAGS  
          - 3.3.2. X-ENDORSE  
             - 3.3.2.1. X-ENDORSE Property  
             - 3.3.2.2. Canonical Endorsement String  
@@ -47,7 +47,6 @@ Table of Contents
             - 3.3.2.5. Interaction with Key Rotation and Revocation  
       - 3.4. Social Identity Extension Properties  
          - 3.4.1. Platform-Specific Properties  
-         - 3.4.2. Generic Social Property  
    4. Feeds  
       - 4.1. Authority  
       - 4.2. Feed Signing  
@@ -67,7 +66,7 @@ Table of Contents
 
    vCard 4.0 provides a standardized format for representing personal identity information. This document introduces a set of extensions tailored for decentralized social identity ecosystems, where users maintain control over their identity by self-hosting their vCard profiles. These extensions enable vCards to specify canonical sources, advertise feed endpoints, and include social-media identifiers in a structured, interoperable, and machine-readable format.
 
-   Profile feeds, specified using the `X-FEED` property, allow users to associate RSS or Atom feeds with their vCard profiles. These feeds can provide updates, posts, or other activity streams, enabling seamless integration with decentralized social networks. Each feed can include optional attributes such as `LANGUAGE` for localization and `CATEGORY` for content classification, ensuring flexibility and relevance for diverse use cases.
+   Profile feeds, specified using the `X-FEED` property, allow users to associate RSS or Atom feeds with their vCard profiles. These feeds can provide updates, posts, or other activity streams, enabling seamless integration with decentralized social networks. Each feed can include optional attributes such as `LANGUAGE` for localization and `TAGS` for content classification, ensuring flexibility and relevance for diverse use cases.
 
    By leveraging the "X-" prefix for all custom properties, as allowed by the vCard specification, this approach ensures compatibility with existing systems while supporting extensibility for future decentralized use cases.
 
@@ -120,7 +119,7 @@ Table of Contents
 
    Revocations MUST be expressed using:
 
-     REVKEY;ENCODING=b[;REASON=<reason>][;DATE=<timestamp>]:<KEY_ID>
+     REVKEY[;REASON=<reason>][;DATE=<timestamp>];ENCODING=b:<KEY_ID>
 
    The `DATE` parameter SHOULD be present and MUST use
    `YYYYMMDDThhmmssZ` format.
@@ -173,7 +172,7 @@ Table of Contents
    A vCard MAY contain multiple `REVKEY` entries that are used to revoke
    previous keys for a grace period using:
 
-      REVKEY;TYPE=public;ALG=ed25519;ENCODING=b:<BASE64_DER_KEY>;REASON=<REASON>;DATE=<DATE>
+      REVKEY;TYPE=public;ALG=ed25519;REASON=<REASON>;DATE=<DATE>;ENCODING=b:<BASE64_DER_KEY>
       
       
    <DATE> in format: YYYYMMDDThhmmssZ
@@ -190,8 +189,8 @@ Table of Contents
 
    Example:
 
-     KEY;TYPE=public;ALG=ed25519;ENCODING=b;PREF=1:NEW_KEY
-     REVKEY;ENCODING=b;REASON=rotated;DATE=20260210T120000Z:OLD_KEY
+     KEY;TYPE=public;ALG=ed25519;PREF=1:NEW_KEY;ENCODING=b
+     REVKEY;REASON=rotated;DATE=20260210T120000Z;ENCODING=b:OLD_KEY
 
 
 3.2.2.2.  Client Behavior During Rotation
@@ -218,9 +217,9 @@ Table of Contents
 
    The following properties are examples of keys in the vCard:
 
-   KEY;TYPE=public;ALG=ed25519;ENCODING=b:<BASE64_DER_KEY>;PREF=1
-   REVKEY;TYPE=public;ALG=ed25519;ENCODING=b:<BASE64_DER_KEY>;REASON=compromised;DATE=20260217T143717Z
-   REVKEY;TYPE=public;ALG=ed25519;ENCODING=b:<BASE64_DER_KEY>;REASON=rotated;DATE=20260221T110230Z
+   KEY;TYPE=public;ALG=ed25519;PREF=1;ENCODING=b:<BASE64_DER_KEY>
+   REVKEY;TYPE=public;ALG=ed25519;REASON=compromised;DATE=20260217T143717Z;ENCODING=b:<BASE64_DER_KEY>
+   REVKEY;TYPE=public;ALG=ed25519;REASON=rotated;DATE=20260221T110230Z;ENCODING=b:<BASE64_DER_KEY>
 
 3.3.  Reserved Extension Properties
 
@@ -256,10 +255,10 @@ Table of Contents
 
      X-FEED;LANGUAGE=en-US:https://example.com/alice/en/feed.xml
 
-3.3.1.1.2. CATEGORY
+3.3.1.1.2. TAGS
 
-   The X-FEED property MAY include a CATEGORY parameter indicating the
-   category of the feed.
+   The X-FEED property MAY include a TAGS parameter indicating the
+   tags of the feed.
 
    Requirements:
 
@@ -268,7 +267,7 @@ Table of Contents
 
    Example:
 
-     X-FEED;CATEGORY=nature:https://example.com/alice/en/feed-nature.xml
+     X-FEED;TAGS=nature:https://example.com/alice/en/feed-nature.xml
 
 3.3.2 X-ENDORSE
 
@@ -280,8 +279,8 @@ Table of Contents
 
    Endorsements MUST be represented using a single vCard property:
 
-     X-ENDORSE;ENCODING=b:<ENDORSEE_KEY_B64>;
-       SIG=<HEX_SIGNATURE>[;DATE=<timestamp>][;CONFIDENCE=<level>]
+     X-ENDORSE;SIG=<HEX_SIGNATURE>[;DATE=<timestamp>][;CONFIDENCE=<level>];ENCODING=b:<ENDORSEE_KEY_B64>;
+       
 
    * `<ENDORSEE_KEY_B64>` is the Key-ID of the endorsed key.
    * `SIG` contains the endorsement signature.
@@ -337,28 +336,19 @@ Table of Contents
    Platform-specific identifiers are represented using custom properties
    of the form:
 
-     X-<PLATFORM>:<value>
+     X-SOCIAL;PLATFORM=<PLATFORM>:<value>
 
    Requirements:
 
-   *  <PLATFORM> MUST consist of uppercase letters A–Z.
+   *  <PLATFORM> MUST consist of lowecase letters A–Z.
    *  The value MAY be a username or a full profile URL.
    *  Multiple properties for the same platform MAY be present.
 
    Examples:
 
-     X-GITHUB:alice
-     X-REDDIT:u/alice
-     X-DISCORD:alice#1234
-
-
-3.4.2.  Generic Social Property
-
-   Platforms without a dedicated property MAY use the generic X-SOCIAL
-   property with a PLATFORM parameter.
-
-   Example:
-
+     X-SOCIAL;PLATFORM=github:alice
+     X-SOCIAL;PLATFORM=reddit:u/alice
+     X-SOCIAL;PLATFORM=discord:alice#1234
      X-SOCIAL;PLATFORM=bluesky:https://bsky.app/profile/alice.bsky.social
 
 4. Feeds
@@ -431,7 +421,7 @@ The feeds represents the last posts of the identity. This uses RSS files.
    *  Recognize X-FEED as feed endpoints.
    *  Recognize KEY as identity verification.
    *  Recognize X-ENDOSE as identity endorsements.
-   *  Recognize X-<PLATFORM> or X-SOCIAL-PLATFORM properties as social identifiers.
+   *  Recognize X-SOCIAL;PLATFORM=<PLATFORM> properties as social identifiers.
 
 5.2.  Client Recommendations
 
@@ -444,7 +434,7 @@ The feeds represents the last posts of the identity. This uses RSS files.
 
 6.  Extensibility
 
-   Additional platforms MAY be represented using new X-<PLATFORM>
+   Additional platforms MAY be represented using new X-SOCIAL;PLATFORM=<PLATFORM>
    properties without requiring registration.  Communities MAY maintain
    shared lists of recommended property names.
 
@@ -462,22 +452,22 @@ The feeds represents the last posts of the identity. This uses RSS files.
    EMAIL:alice@example.com
    TEL;TYPE=cell:+1234567890
    ADR;TYPE=home:;;123 Main Street;Hometown;CA;12345;USA
-   KEY;TYPE=public;ALG=ed25519;ENCODING=b:ALICE_KEY_BASE64;PREF=1
-   REVKEY;TYPE=public;ALG=ed25519;ENCODING=b:ALICE_COMPROMISED_KEY_BASE64;REASON=compromised;DATE=20260217T143717Z
-   REVKEY;TYPE=public;ALG=ed25519;ENCODING=b:ALICE_ROTATED_KEY_BASE64;REASON=rotated;DATE=20260221T110230Z
+   KEY;TYPE=public;ALG=ed25519;PREF=1;ENCODING=b:ALICE_KEY_BASE64
+   REVKEY;TYPE=public;ALG=ed25519;REASON=compromised;DATE=20260217T143717Z;ENCODING=b:ALICE_COMPROMISED_KEY_BASE64
+   REVKEY;TYPE=public;ALG=ed25519;REASON=rotated;DATE=20260221T110230Z;ENCODING=b:ALICE_ROTATED_KEY_BASE64
    URL:https://example.com
    SOURCE:https://example.com/alice.vcf
    X-FEED:https://example.com/alice/feed.xml
    X-FEED;LANGUAGE=en-US:https://example.com/alice/en/feed.xml
    X-FEED;LANGUAGE=es-ES:https://example.com/alice/es/feed.xml
-   X-FEED;LANGUAGE=en-US;CATEGORY=nature:https://example.com/alice/en/feed-nature.xml
-   X-FEED;LANGUAGE=es-ES;CATEGORY=nature:https://example.com/alice/es/feed-nature.xml
-   X-GITHUB:alice
-   X-REDDIT:u/alice
-   X-DISCORD:alice#1234
+   X-FEED;LANGUAGE=en-US;TAGS=nature:https://example.com/alice/en/feed-nature.xml
+   X-FEED;LANGUAGE=es-ES;TAGS=nature:https://example.com/alice/es/feed-nature.xml
+   X-SOCIAL;PLATFORM=github:alice
+   X-SOCIAL;PLATFORM=reddit:u/alice
+   X-SOCIAL;PLATFORM=discord:alice#1234
    X-SOCIAL;PLATFORM=bluesky:https://bsky.app/profile/alice.bsky.social
-   X-ENDORSE;ENCODING=b:BOB_KEY_BASE64;SIG=1111aaaabbbb2222cccc3333dddd4444eeee5555ffff6666;DATE=20260210T120000Z;CONFIDENCE=high
-   X-ENDORSE;ENCODING=b:CAROL_KEY_BASE64;SIG=abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234;DATE=20260211T090000Z;CONFIDENCE=medium
+   X-ENDORSE;SIG=1111aaaabbbb2222cccc3333dddd4444eeee5555ffff6666;DATE=20260210T120000Z;CONFIDENCE=high;ENCODING=b:BOB_KEY_BASE64
+   X-ENDORSE;SIG=abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234;DATE=20260211T090000Z;CONFIDENCE=medium;ENCODING=b:CAROL_KEY_BASE64
    END:VCARD
 
 

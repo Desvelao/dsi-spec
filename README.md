@@ -1,6 +1,6 @@
-# Distributed Social Identity (DSI)
+# Decentralized Social Identity (DSI)
 
-This repository contains the draft specification for **Distributed Social Identity (DSI)**, a decentralized profile format based on vCard 4.0. The specification introduces extensions to support distributed social networks, enabling users to maintain control over their identity while ensuring interoperability with decentralized ecosystems.
+This repository contains the draft specification for **Decentralized Social Identity (DSI)**, a decentralized profile format based on vCard 4.0. The specification introduces extensions to support decentralized social networks, enabling users to maintain control over their identity while ensuring interoperability with decentralized ecosystems.
 
 ## Purpose
 
@@ -16,7 +16,7 @@ The DSI specification aims to provide a standardized and extensible format for r
 
 - **Decentralized Identity**: Users can self-host their vCard profiles, ensuring full control over their identity.
 - **Feed Integration**: Profiles can include RSS/Atom feeds to provide updates, posts, or activity streams.
-- **Extensibility**: Custom properties (e.g., `X-FEED`, `X-ENDORSE`, `X-<PLATFORM>`) allow for future extensions without breaking compatibility.
+- **Extensibility**: Custom properties (e.g., `X-FEED`, `X-ENDORSE`, `X-SOCIAL`) allow for future extensions without breaking compatibility.
 - **Security**: Supports Ed25519 cryptographic keys for signing and verifying identity-related data.
 - **Interoperability**: Ensures compatibility with existing vCard systems while enabling decentralized use cases.
 
