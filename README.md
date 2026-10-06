@@ -24,7 +24,7 @@ The DSI specification aims to provide a standardized and extensible format for r
 
 The draft specification is located in the `draft/` directory:
 
-- **`draft-desvelao-dsi-00.rfc`**: The main document defining the DSI specification.
+- **`draft-desvelao-dsi-01.rfc`**: The main document defining the DSI specification.
 
 ## Example Use Case
 

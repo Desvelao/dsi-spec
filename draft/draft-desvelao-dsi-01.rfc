@@ -1,0 +1,716 @@
+Internet-Draft                                               Decentralized Social Identity
+Intended status: Informational                               October 2026
+Expires: April 2027
+
+
+      Decentralized Social Identity (DSI)  
+      A Decentralized Profile Specification Using vCard and RSS  
+
+      Abstract  
+
+         This document specifies a decentralized social profile format based on vCard 4.0, extended with non-standard properties to support decentralized social networks. The specification introduces a mandatory `SOURCE` property to define the canonical location of the vCard, `X-FEED` properties for associating RSS/Atom feeds with the profile, and additional extensible properties for platform-specific identifiers or endorsements. These extensions aim to enable interoperable, self-hosted identity documents that integrate seamlessly with decentralized ecosystems while supporting extensibility for future use cases.
+
+
+Status of This Memo
+
+   This document is not an Internet Standards Track specification.  It
+   is published for informational purposes and may be used freely for
+   software implementation, federation protocols, or identity systems.
+
+
+Table of Contents
+
+   1. Introduction  
+   2. Conventions Used in This Document  
+   3. Identity  
+      - 3.1. Required Properties  
+         - 3.1.1. SOURCE  
+      - 3.2. Verification  
+         - 3.2.1. Key Revocation  
+            - 3.2.1.1. REVKEY Property  
+            - 3.2.1.2. Revocation Reasons  
+            - 3.2.1.3. Client Behavior for Each Reason  
+         - 3.2.2. Key Rotation  
+            - 3.2.2.1. Rotation Procedure  
+            - 3.2.2.2. Client Behavior During Rotation  
+            - 3.2.2.3. Examples  
+      - 3.3. Reserved Extension Properties  
+         - 3.3.1. X-FEED  
+            - 3.3.1.1. Attributes  
+               - 3.3.1.1.1. LANGUAGE  
+               - 3.3.1.1.2. TAGS  
+         - 3.3.2. X-ENDORSE  
+            - 3.3.2.1. X-ENDORSE Property  
+            - 3.3.2.2. Canonical Endorsement String  
+            - 3.3.2.3. Signature Algorithm  
+            - 3.3.2.4. Client Verification
+            - 3.3.2.5. Interaction with Key Rotation and Revocation
+         - 3.3.3. X-DSI-VERSION
+      - 3.4. Social Identity Extension Properties
+         - 3.4.1. Platform-Specific Properties
+   4. Feeds
+      - 4.1. Authority
+      - 4.2. Feed Signing
+         - 4.2.1. Canonical Item String
+         - 4.2.2. Signature Algorithm
+         - 4.2.3. Feed Item Format
+         - 4.2.4. Client Verification
+   5. Processing Requirements
+      - 5.1. Client Requirements
+      - 5.2. Client Recommendations
+      - 5.3. Error Handling
+   6. Extensibility
+   7. Example vCard
+   8. Security Considerations
+   9. Privacy Considerations
+   Appendix A. Formal Syntax (ABNF)
+
+
+1.  Introduction
+
+   vCard 4.0 provides a standardized format for representing personal identity information. This document introduces a set of extensions tailored for decentralized social identity ecosystems, where users maintain control over their identity by self-hosting their vCard profiles. These extensions enable vCards to specify canonical sources, advertise feed endpoints, and include social-media identifiers in a structured, interoperable, and machine-readable format.
+
+   Profile feeds, specified using the `X-FEED` property, allow users to associate RSS or Atom feeds with their vCard profiles. These feeds can provide updates, posts, or other activity streams, enabling seamless integration with decentralized social networks. Each feed can include optional attributes such as `LANGUAGE` for localization and `TAGS` for content classification, ensuring flexibility and relevance for diverse use cases.
+
+   By leveraging the "X-" prefix for all custom properties, as allowed by the vCard specification, this approach ensures compatibility with existing systems while supporting extensibility for future decentralized use cases.
+
+
+2.  Conventions Used in This Document
+
+   The key words "MUST", "MUST NOT", "SHOULD", and "MAY" are to be
+   interpreted as described in RFC 2119.
+
+   All examples use vCard 4.0 syntax as defined in RFC 6350.
+
+
+3. Identity
+
+   The profile is declared using a vCard 4.0.
+
+3.1. Required Properties
+
+3.1.1.  SOURCE
+
+   The vCard MUST include a SOURCE property containing the canonical URL
+   from which the vCard can be retrieved.
+
+   Requirements:
+
+   *  The value MUST be an absolute URL.
+   *  The URL SHOULD use HTTPS.
+   *  The URL SHOULD dereference to the vCard itself.
+
+   Example:
+
+     SOURCE:https://example.com/alice.vcf
+
+
+3.2. Verification
+
+   Identities MAY include their public key in the vCard using:
+
+     KEY;TYPE=public;ALG=ed25519;ENCODING=b:<BASE64_DER_KEY>
+
+   Implementations MUST support Ed25519 keys.  Additional algorithms MAY
+   be supported.
+
+   A vCard MAY contain multiple `KEY` entries.  The preferred key SHOULD
+   be marked with `PREF=1`.
+
+   Throughout this document, the "Key-ID" of a key is the exact value of
+   its `KEY` property: the base64 encoding of the DER-encoded
+   SubjectPublicKeyInfo of the public key (`<BASE64_DER_KEY>`).
+   `<KEY_ID>` and `<ENDORSEE_KEY_B64>` are alternative names for this
+   same value.  For Ed25519, the DER encoding is 44 bytes.
+
+3.2.1. Key Revocation
+
+3.2.1.1.  REVKEY Property
+
+   Revocations MUST be expressed using:
+
+     REVKEY[;REASON=<reason>][;DATE=<timestamp>];ENCODING=b:<KEY_ID>
+
+   The `DATE` parameter SHOULD be present and MUST use
+   `YYYYMMDDThhmmssZ` format.
+
+
+3.2.1.2.  Revocation Reasons
+
+   The following reasons are defined:
+
+   * compromised  
+       The private key is believed to be stolen or exposed.
+
+   * rotated  
+       The key has been intentionally replaced with a new one.
+
+   * superseded  
+       The key is replaced due to algorithm migration or identity
+       restructuring.
+
+   * retired  
+       The key is no longer used but not compromised.
+
+   * lost  
+       The private key is lost and cannot be used.
+
+   * deprecated  
+       The key remains valid but SHOULD NOT be used going forward.
+
+
+3.2.1.3.  Client Behavior for Each Reason
+
+   Clients MUST interpret revocation reasons as follows:
+
+   +-------------+------------------------------+------------------------------+
+   | Reason      | Accept old signatures?       | Accept new signatures?       |
+   +-------------+------------------------------+------------------------------+
+   | compromised | NO                           | NO                           |
+   | rotated     | YES (before DATE)            | NO                           |
+   | superseded  | YES                           | NO                           |
+   | retired     | YES                           | NO                           |
+   | lost        | YES                           | NO                           |
+   | deprecated  | YES                           | YES (with warning)           |
+   +-------------+------------------------------+------------------------------+
+
+   If `DATE` is omitted, clients SHOULD treat the revocation as
+   immediate.
+
+3.2.2. Key Rotation
+   
+   A vCard MAY contain multiple `REVKEY` entries that are used to revoke
+   previous keys for a grace period using:
+
+      REVKEY;TYPE=public;ALG=ed25519;REASON=<REASON>;DATE=<DATE>;ENCODING=b:<BASE64_DER_KEY>
+      
+      
+   <DATE> in format: YYYYMMDDThhmmssZ
+
+3.2.2.1  Rotation Procedure
+
+   To rotate a key, a publisher MUST:
+
+   1. Generate a new keypair.
+   2. Add the new public key as a `KEY` property.
+   3. Mark the new key with `PREF=1`.
+   4. Remove `PREF` from all other keys.
+   5. Add a `REVKEY` entry for the old key with reason `rotated`.
+
+   Example:
+
+     KEY;TYPE=public;ALG=ed25519;PREF=1;ENCODING=b:<NEW_KEY>
+     REVKEY;TYPE=public;ALG=ed25519;REASON=rotated;DATE=20260210T120000Z;ENCODING=b:<OLD_KEY>
+
+
+3.2.2.2.  Client Behavior During Rotation
+
+   Clients MUST:
+
+   * Treat the new `PREF=1` key as the active signing key.
+   * Continue to accept signatures made by the old key prior to the
+     rotation date.
+   * Reject new signatures made by the old key after rotation.
+   
+   
+   The rest could be rotated keys and they
+   SHOULD NOT be trusted; a REVKEY property SHOULD be used to indicate the
+   revocation reason that can be compromised or rotated.
+
+   The rotated keys SHOULD be maintained in the vCard for a grace period of
+   30 days after the REVKEY `DATE`, after which publishers MAY remove them.
+   Regardless of whether the old key is still present, clients MUST continue
+   to apply the DATE-based accept/reject rules defined in Section 3.2.1.3.
+
+   The identity verification can be used to claim authority of the
+   spec extensions as feeds or web-trust endorsements
+   (see related spec).
+
+3.2.2.3 Examples
+
+   The following properties are examples of keys in the vCard:
+
+   KEY;TYPE=public;ALG=ed25519;PREF=1;ENCODING=b:<BASE64_DER_KEY>
+   REVKEY;TYPE=public;ALG=ed25519;REASON=compromised;DATE=20260217T143717Z;ENCODING=b:<BASE64_DER_KEY>
+   REVKEY;TYPE=public;ALG=ed25519;REASON=rotated;DATE=20260221T110230Z;ENCODING=b:<BASE64_DER_KEY>
+
+3.3.  Reserved Extension Properties
+
+3.3.1.  X-FEED
+
+   The X-FEED property defines a URL for an RSS or Atom feed associated
+   with the identity.
+
+   Requirements:
+
+   *  The value MUST be an absolute URL.
+   *  Multiple X-FEED properties MAY be present.
+
+   Example:
+
+     X-FEED:https://example.com/alice/feed.xml
+
+3.3.1.1. Attributes
+
+   The X-FEED property can have the following attributes:
+
+3.3.1.1.1. LANGUAGE
+
+   The X-FEED property MAY include a LANGUAGE parameter indicating the
+   language or locale of the feed.
+
+   Requirements:
+
+   *  The LANGUAGE parameter MUST follow BCP 47 syntax.
+   *  Multiple language-specific feeds MAY be present.
+
+   Example:
+
+     X-FEED;LANGUAGE=en-US:https://example.com/alice/en/feed.xml
+
+3.3.1.1.2. TAGS
+
+   The X-FEED property MAY include a TAGS parameter indicating the
+   tags of the feed.
+
+   Requirements:
+
+   *  The TAGS parameter MUST be a comma-separated list of lowercase
+      alphanumeric tokens.
+   *  Multiple tagged feeds MAY be present.
+
+   Example:
+
+     X-FEED;TAGS=nature:https://example.com/alice/en/feed-nature.xml
+
+3.3.2 X-ENDORSE
+
+   The X-ENDORSE property defines the endorsement of other identities
+   in the network.
+
+
+3.3.2.1  X-ENDORSE Property
+
+   Endorsements MUST be represented using a single vCard property:
+
+     X-ENDORSE;SIG=<HEX_SIGNATURE>[;DATE=<timestamp>][;CONFIDENCE=<level>];ENCODING=b:<ENDORSEE_KEY_B64>
+
+
+   * `<ENDORSEE_KEY_B64>` is the Key-ID of the endorsed key (see
+     Section 3.2).
+   * `SIG` contains the endorsement signature.
+   * `DATE` is an optional timestamp in `YYYYMMDDThhmmssZ`.
+   * `CONFIDENCE` is an optional hint (`low`, `medium`, `high`).
+
+   Each endorsement MUST appear as a separate `X-ENDORSE` property.
+
+
+3.3.2.2.  Canonical Endorsement String
+
+   The canonical string for an endorsement MUST be:
+
+     endorse:<ENDORSEE_KEY_B64>
+
+   The string MUST be encoded in UTF‑8.
+
+
+3.3.2.3.  Signature Algorithm
+
+   Endorsements MUST be signed using Ed25519.
+
+   The signature MUST be encoded as lowercase hexadecimal (128
+   characters for Ed25519) and placed in the `SIG` parameter.
+
+
+3.3.2.4.  Client Verification
+
+   For each `X-ENDORSE` entry, clients MUST:
+
+   1. Extract `<ENDORSEE_KEY_B64>` from the property value.
+   2. Extract the `SIG` parameter.
+   3. Reconstruct the canonical string.
+   4. Verify the signature using the endorser’s public key.
+
+   Invalid endorsements MUST be ignored.
+
+
+3.3.2.5.  Interaction with Key Rotation and Revocation
+
+   If an endorsee rotates their key, they SHOULD endorse the new key.
+   Trusted endorsers MAY also endorse the new key.
+
+   If a key is revoked, endorsements for that key MUST NOT be considered
+   valid after the revocation date.  If the revocation reason is
+   `compromised`, clients SHOULD treat all endorsements for that key as
+   invalid.
+
+3.3.3.  X-DSI-VERSION
+
+   The X-DSI-VERSION property allows a vCard to declare which draft
+   revision and optional features of this specification it implements,
+   enabling capability negotiation between publishers and clients.  It
+   is distinct from the standard vCard `VERSION` property (Section 7),
+   which always identifies the vCard format version (`4.0`).
+
+   Requirements:
+
+   *  The value MUST be the two-digit draft revision identifier the
+      vCard was authored against (e.g. `00`, `01`).
+   *  The property MAY include a `FEATURES` parameter listing a
+      comma-separated set of optional feature tokens the vCard uses
+      (e.g. `tags`, `endorse`).
+   *  At most one `X-DSI-VERSION` property SHOULD be present.
+   *  Clients MUST treat a missing `X-DSI-VERSION` property as
+      revision `00` with no optional features declared, for backward
+      compatibility.
+
+   Example:
+
+     X-DSI-VERSION;FEATURES=tags,endorse:01
+
+3.4.  Social Identity Extension Properties
+
+3.4.1.  Platform-Specific Properties
+
+   Platform-specific identifiers are represented using custom properties
+   of the form:
+
+     X-SOCIAL;PLATFORM=<PLATFORM>:<value>
+
+   Requirements:
+
+   *  <PLATFORM> MUST consist of lowercase letters a–z.
+   *  The value MAY be a username or a full profile URL.
+   *  Multiple properties for the same platform MAY be present.
+
+   Examples:
+
+     X-SOCIAL;PLATFORM=github:alice
+     X-SOCIAL;PLATFORM=reddit:u/alice
+     X-SOCIAL;PLATFORM=discord:alice#1234
+     X-SOCIAL;PLATFORM=bluesky:https://bsky.app/profile/alice.bsky.social
+     X-SOCIAL;PLATFORM=activitypub:https://social.example/@alice
+     X-SOCIAL;PLATFORM=mastodon:@alice@social.example
+
+   For platforms whose profiles are addressable by URL (e.g.
+   `activitypub`), publishers SHOULD use the full profile URL.  For
+   other platforms, a platform-specific username or handle is
+   RECOMMENDED.
+
+4. Feeds
+
+The feeds represent the latest posts of the identity.  A feed MAY be an
+RSS or an Atom document (see Section 3.3.1).  Item signing, as
+specified in this section, is defined only for RSS 2.0 `<item>`
+elements in this revision; signing of Atom entries is out of scope.
+
+4.1. Authority
+
+   The publishers can optionally sign individual RSS items to provide
+   authenticity and integrity guarantees using a key defined in the
+   vCard.
+
+4.2. Feed Signing
+
+4.2.1.  Canonical Item String
+
+   Each RSS `<item>` MUST be signed individually.
+
+   The canonical string MUST be constructed as:
+
+     <pubDate>\n<title>\n<description_plain>
+
+   * `<pubDate>` MUST match the exact string in the RSS item.
+   * `<title>` MUST be the unescaped text.
+   * `<description_plain>` MUST be the plain-text description before
+     HTML or CDATA encoding.
+
+   The canonical string MUST use UTF‑8 encoding.
+
+
+4.2.2.  Signature Algorithm
+
+   Feed signatures MUST use Ed25519.
+
+   The signature MUST be encoded as lowercase hexadecimal.
+
+
+4.2.3.  Feed Item Format
+
+   Each signed item MUST include:
+
+```xml
+<signature alg="ed25519" key-id="<KEY_ID>">HEX_SIGNATURE</signature>
+```
+
+   * `alg` MUST match the algorithm in the vCard.
+   * `key-id` SHOULD match the Key-ID of the signing key.
+
+
+4.2.4.  Client Verification
+
+   For each feed item, clients MUST:
+
+   1. Extract the signature and `key-id`.
+   2. Retrieve the corresponding public key from the publisher’s vCard.
+   3. Reconstruct the canonical string.
+   4. Verify the signature.
+
+   Items with invalid signatures MUST be treated as untrusted.
+
+
+5.  Processing Requirements
+
+5.1.  Client Requirements
+
+   Clients implementing this specification MUST:
+
+   *  Retrieve the vCard from the URL in the SOURCE property.
+   *  When a vCard was retrieved from a URL, compare its `SOURCE` value
+      with the requested URL, after normalization (case-insensitive
+      scheme and host, removal of a default port and of a trailing dot
+      in the host).  If they do not match, the client MUST NOT treat the
+      vCard as the identity published at the requested URL (see
+      Section 8).
+   *  Preserve unknown X- properties when reserializing the vCard.
+   *  Recognize X-FEED as feed endpoints.
+   *  Recognize KEY as identity verification.
+   *  Recognize X-ENDORSE as identity endorsements.
+   *  Recognize X-SOCIAL;PLATFORM=<PLATFORM> properties as social identifiers.
+   *  Recognize X-DSI-VERSION as the declared draft revision and feature set.
+
+5.2.  Client Recommendations
+
+   Clients implementing this specification SHOULD:
+
+   *  Prefer language-specific feeds when matching user locale.
+   *  Normalize usernames where platform conventions allow.
+   *  Display platform icons or labels based on property names.
+
+5.3.  Error Handling
+
+   Clients MUST NOT fail to process an otherwise well-formed vCard
+   solely because of a malformed DSI extension property.  Specifically,
+   clients MUST:
+
+   *  Ignore a `SOURCE` property whose value is not an absolute URL,
+      and MUST NOT treat the vCard as self-authoritative for that
+      property.
+   *  Treat an `X-FEED` URL that cannot be dereferenced, times out, or
+      returns a non-2xx status as unavailable, and MUST NOT fail
+      processing of the rest of the vCard.
+   *  Ignore any `KEY` or `REVKEY` property whose parameter set is
+      malformed (e.g. missing `ENCODING`, an unrecognized `ALG`, or a
+      `DATE` that does not match `YYYYMMDDThhmmssZ`), and MUST NOT
+      treat the associated key as valid or revoked.
+   *  Log or otherwise surface ignored properties for debugging
+      purposes, without exposing them as trusted data to the user.
+
+
+6.  Extensibility
+
+   This specification reserves the following `X-` properties.  Clients
+   MUST preserve any unrecognized `X-` property when reserializing a
+   vCard (see Section 5.1), so unregistered extensions remain
+   forward-compatible.
+
+   +----------------+-----------------------------------------------+
+   | Property       | Purpose                                        |
+   +----------------+-----------------------------------------------+
+   | X-FEED         | RSS/Atom feed endpoint (Section 3.3.1)         |
+   | X-ENDORSE      | Identity endorsement (Section 3.3.2)           |
+   | X-DSI-VERSION  | Draft revision / feature negotiation           |
+   |                | (Section 3.3.3)                                |
+   | X-SOCIAL       | Platform-specific identifier (Section 3.4.1)   |
+   +----------------+-----------------------------------------------+
+
+   Additional platforms MAY be represented using new
+   X-SOCIAL;PLATFORM=<PLATFORM> properties without requiring
+   registration.  Communities MAY maintain shared, informally-governed
+   lists of recommended `PLATFORM` values (e.g. `github`, `reddit`,
+   `discord`, `bluesky`, `activitypub`, `mastodon`) to reduce accidental collisions between
+   unrelated platforms choosing the same token.
+
+   New top-level `X-` properties beyond those listed above SHOULD be
+   distinguished with a vendor- or project-specific prefix (e.g.
+   `X-ACME-FOO`) to avoid colliding with a future revision of this
+   specification or with another implementation's extension.
+
+
+7.  Example vCard
+
+   The following example illustrates a complete DSI‑vCard:
+
+   BEGIN:VCARD
+   VERSION:4.0
+   FN:Alice Example
+   N:Example;Alice;;;
+   NICKNAME:Ali
+   BDAY:1990-05-15
+   EMAIL:alice@example.com
+   TEL;TYPE=cell:+1234567890
+   ADR;TYPE=home:;;123 Main Street;Hometown;CA;12345;USA
+   KEY;TYPE=public;ALG=ed25519;PREF=1;ENCODING=b:MCowBQYDK2VwAyEAOAiOTCroL1xFxoCKYaZJDTxhLOHaI1cURm/HSPvEy7s=
+   REVKEY;TYPE=public;ALG=ed25519;REASON=compromised;DATE=20260217T143717Z;ENCODING=b:MCowBQYDK2VwAyEA0YGzEO2QT50oIZ71H2TcJ/D1LmMVlLmX5Cy5aQcwPOw=
+   REVKEY;TYPE=public;ALG=ed25519;REASON=rotated;DATE=20260221T110230Z;ENCODING=b:MCowBQYDK2VwAyEAlUfscKrwDEj+S+31tJW+mMalKSEt8XvIxvScw7ou858=
+   URL:https://example.com
+   SOURCE:https://example.com/alice.vcf
+   X-DSI-VERSION;FEATURES=tags,endorse:01
+   X-FEED:https://example.com/alice/feed.xml
+   X-FEED;LANGUAGE=en-US:https://example.com/alice/en/feed.xml
+   X-FEED;LANGUAGE=es-ES:https://example.com/alice/es/feed.xml
+   X-FEED;LANGUAGE=en-US;TAGS=nature:https://example.com/alice/en/feed-nature.xml
+   X-FEED;LANGUAGE=es-ES;TAGS=nature:https://example.com/alice/es/feed-nature.xml
+   X-SOCIAL;PLATFORM=github:alice
+   X-SOCIAL;PLATFORM=reddit:u/alice
+   X-SOCIAL;PLATFORM=discord:alice#1234
+   X-SOCIAL;PLATFORM=bluesky:https://bsky.app/profile/alice.bsky.social
+   X-ENDORSE;SIG=0c036138c11d467ad6518502d45dd0eeea4745b17ebea8dac01849cdd3946d679a8c6bd039caff7077abfbc2aff9a1d96bff16b20134c1368fc93a2b17f07e00;DATE=20260210T120000Z;CONFIDENCE=high;ENCODING=b:MCowBQYDK2VwAyEA3XVgQP3VFF4r+YMtJk3QgOSz5zAWvfZXS0zYfqppf14=
+   X-ENDORSE;SIG=ee7d3dbc37bc9b9463fd64fea7e05eb27d900967b4af64de0f39b2cf0e4546768c0320a718adccdde09ecd2807230ccba75eea6dd34081ad9255f3fe79cd9d07;DATE=20260211T090000Z;CONFIDENCE=medium;ENCODING=b:MCowBQYDK2VwAyEAPuZ2QmBwf82HjQ+DfemTwqHYrA/Wqg+qE4+HZyKANwM=
+   END:VCARD
+
+
+8.  Security Considerations
+
+   Implementations should consider the authenticity of the SOURCE URL
+   and the integrity.
+
+   Identity Substitution:
+
+   *  A vCard served at one URL can declare a different `SOURCE`.
+      Clients MUST apply the `SOURCE` comparison defined in
+      Section 5.1; otherwise an attacker could present a profile
+      belonging to another identity as if it were published at the
+      requested URL.
+
+   Transport Security:
+
+   *  Clients SHOULD reject a `SOURCE`, `X-FEED`, or endorsement-
+      related fetch over plain HTTP once an HTTPS URL has been seen
+      for the same resource, to resist downgrade attacks.
+   *  Clients MUST validate TLS certificates when dereferencing
+      `SOURCE` and `X-FEED` URLs; certificate validation MUST NOT be
+      disabled to work around expired or self-signed certificates.
+
+   Denial of Service and Replay:
+
+   *  A vCard MAY contain an unbounded number of `X-FEED`, `X-ENDORSE`,
+      and `REVKEY` entries.  Clients SHOULD impose a reasonable cap on
+      how many entries they process or fetch per vCard, and SHOULD
+      paginate or lazily load beyond that cap, to avoid resource
+      exhaustion from a maliciously large profile.
+   *  Clients SHOULD cache verification results (e.g. signature
+      checks) to avoid repeated expensive cryptographic operations
+      when a vCard or feed is re-fetched unchanged.
+
+   Key Storage:
+
+   *  Publishers MUST protect private keys corresponding to any `KEY`
+      property, using platform-appropriate secure storage (e.g. an
+      OS keychain, hardware security module, or encrypted-at-rest
+      storage).  Private keys MUST NOT be embedded in the vCard or
+      any other publicly distributed artifact.
+
+   Clients MUST clearly indicate verification status.
+   Implementations SHOULD support key rotation and revocation.
+   Endorsements express social trust and do not guarantee identity
+   correctness.
+
+
+9.  Privacy Considerations
+
+   A DSI vCard is designed to be published and retrieved publicly;
+   implementers and publishers SHOULD understand the privacy
+   implications of doing so.
+
+   *  `X-ENDORSE` and `X-SOCIAL` properties are inherently public and
+      MAY be used to correlate an identity across platforms or to
+      build a social graph.  Publishers who wish to limit
+      cross-platform correlation SHOULD avoid publishing identifiers
+      for platforms they do not want linked.
+   *  Endorsement graphs (Section 3.3.2) reveal social relationships.
+      Publishers SHOULD be aware that endorsing another identity is
+      itself a public disclosure of association.
+   *  Feed access via `X-FEED` MAY leak metadata (e.g. IP address,
+      request timing) to the feed host on every fetch.  Clients SHOULD
+      document this to users where feeds are fetched automatically.
+   *  Revocation records (`REVKEY`) are retained in the vCard for the
+      grace period defined in Section 3.2.2.2 and MAY remain
+      discoverable afterward via cached copies, archives, or client
+      history; publishers SHOULD NOT rely on removal from the current
+      vCard alone to make a compromised key unlinkable from the
+      identity.
+   *  This specification does not define an access-control mechanism.
+      Any information a publisher does not want public MUST NOT be
+      placed in a DSI vCard or any resource it references.
+
+
+Appendix A.  Formal Syntax (ABNF)
+
+   The following defines the syntax of DSI vCard extension properties
+   using ABNF (RFC 5234).  Core rules ALPHA, DIGIT, HEXDIG, and CRLF
+   are as defined in Appendix B of RFC 5234.  `value-char` follows the
+   general vCard property syntax of RFC 6350 Section 3.3.
+
+   ; -- SOURCE --
+
+   SOURCE-prop     = "SOURCE" ":" absolute-URI CRLF
+
+   ; -- KEY --
+
+   KEY-prop        = "KEY" *(";" key-param) ":" b64-key CRLF
+   key-param       = pref-param / type-param / alg-param /
+                     encoding-param
+   pref-param      = "PREF=1"
+   type-param      = "TYPE=public"
+   alg-param       = "ALG=" alg-name
+   alg-name        = "ed25519"                ; only value defined in -00
+   encoding-param  = "ENCODING=b"
+
+   ; -- REVKEY --
+
+   REVKEY-prop     = "REVKEY" *(";" revkey-param) ":" b64-key CRLF
+   revkey-param    = key-param / reason-param / date-param
+   reason-param    = "REASON=" reason
+   reason          = "compromised" / "rotated" / "superseded" /
+                     "retired" / "lost" / "deprecated"
+   date-param      = "DATE=" date-time
+   date-time       = 8DIGIT "T" 6DIGIT "Z"   ; YYYYMMDDThhmmssZ
+
+   ; -- X-FEED --
+
+   XFEED-prop      = "X-FEED" *(";" xfeed-param) ":" absolute-URI CRLF
+   xfeed-param     = language-param / tags-param
+   language-param  = "LANGUAGE=" language-tag   ; BCP 47 (RFC 5646)
+   tags-param      = "TAGS=" tag *("," tag)
+   tag             = 1*(ALPHA / DIGIT)
+
+   ; -- X-ENDORSE --
+
+   XENDORSE-prop   = "X-ENDORSE" ";" "SIG=" hex-sig
+                     [";" "DATE=" date-time]
+                     [";" "CONFIDENCE=" confidence]
+                     ";" encoding-param ":" b64-key CRLF
+   hex-sig         = 128(%x30-39 / %x61-66)   ; lowercase hex, Ed25519
+   confidence      = "low" / "medium" / "high"
+
+   ; -- X-SOCIAL --
+
+   XSOCIAL-prop    = "X-SOCIAL" ";" "PLATFORM=" platform ":"
+                     social-value CRLF
+   platform        = 1*(%x61-7A)              ; lowercase a-z
+   social-value    = 1*value-char
+
+   ; -- X-DSI-VERSION --
+
+   XVERSION-prop   = "X-DSI-VERSION"
+                     [";" "FEATURES=" feature *("," feature)]
+                     ":" revision CRLF
+   feature         = 1*(ALPHA / DIGIT / "-")
+   revision        = 2DIGIT                   ; e.g. "00", "01"
+
+   ; -- shared --
+
+   b64-key         = 1*(ALPHA / DIGIT / "+" / "/" / "=")
+   absolute-URI    = <absolute-URI, as defined in RFC 3986 Section 4.3>
+   value-char      = <value-char, as defined in RFC 6350 Section 3.3>
